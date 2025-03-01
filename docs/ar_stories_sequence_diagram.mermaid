@@ -1,0 +1,80 @@
+sequenceDiagram
+    participant U as User
+    participant A as MainActivity
+    participant VM as MainViewModel
+    participant MM as MediaManager
+    participant AE as AREngine
+    participant CR as ContentRepository
+    participant QR as QRSystem
+    participant DB as RoomDatabase
+    participant Cloud as FirebaseStorage
+
+    %% App Initialization
+    U->>A: Launch App
+    A->>VM: onCreate()
+    VM->>AE: initialize()
+    VM->>MM: initialize()
+
+    %% Creation Flow
+    U->>A: Start Creation
+    A->>VM: startCreation()
+    VM->>MM: startCamera()
+    activate MM
+    MM-->>A: cameraPreview
+    deactivate MM
+
+    U->>A: Capture Media
+    A->>VM: captureMedia()
+    VM->>MM: captureImage()/recordVideo()
+    activate MM
+    MM-->>VM: mediaUri
+    VM->>MM: processMedia(mediaUri)
+    MM-->>VM: processedMedia
+    deactivate MM
+
+    VM->>AE: loadTarget(processedMedia.targetImage)
+    activate AE
+    AE-->>VM: targetLoaded
+    VM->>AE: renderContent(processedMedia.overlayContent)
+    AE-->>VM: previewReady
+    deactivate AE
+    VM-->>A: showPreview
+
+    %% Save and Share Flow
+    U->>A: Confirm Creation
+    A->>VM: saveContent()
+    VM->>CR: saveContent(arContent)
+    activate CR
+    CR->>DB: saveLocal(arContent)
+    CR->>Cloud: uploadContent()
+    Cloud-->>CR: contentUrl
+    CR->>QR: generateQR(contentUrl)
+    activate QR
+    QR-->>CR: qrCode
+    deactivate QR
+    CR-->>VM: shareInfo
+    deactivate CR
+    VM-->>A: showQRCode
+
+    %% View Flow
+    U->>A: Scan QR
+    A->>VM: startScanning()
+    VM->>QR: scanQR()
+    activate QR
+    QR-->>VM: contentUrl
+    deactivate QR
+    VM->>CR: loadContent(contentUrl)
+    activate CR
+    CR->>Cloud: downloadContent()
+    Cloud-->>CR: arContent
+    CR->>DB: cacheContent(arContent)
+    CR-->>VM: arContent
+    deactivate CR
+
+    VM->>AE: loadTarget(arContent.targetImage)
+    activate AE
+    AE-->>VM: targetLoaded
+    VM->>AE: renderContent(arContent.overlayContent)
+    AE-->>VM: arView
+    deactivate AE
+    VM-->>A: showARView
