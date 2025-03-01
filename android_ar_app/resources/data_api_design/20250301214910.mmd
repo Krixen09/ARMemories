@@ -1,0 +1,47 @@
+
+classDiagram
+    class MainActivity {
+        +onCreate(savedInstanceState: Bundle)
+        +initUI()
+    }
+    class ARActivity {
+        +onCreate(savedInstanceState: Bundle)
+        +initAR()
+        +onResume()
+        +onPause()
+    }
+    class FirebaseManager {
+        +initFirebase()
+        +saveUserData(data: User)
+        +fetchUserData(userId: String): User
+    }
+    class UserSettingsActivity {
+        +onCreate(savedInstanceState: Bundle)
+        +loadUserSettings()
+        +saveUserSettings()
+    }
+    class TutorialActivity {
+        +onCreate(savedInstanceState: Bundle)
+        +startTutorial()
+    }
+    class AppDatabase {
+        +saveProgress(progress: Progress)
+        +loadProgress(userId: String): Progress
+    }
+    class User {
+        +userId: String
+        +settings: Settings
+    }
+    class Progress {
+        +userId: String
+        +progressData: String
+    }
+    class Settings {
+        +volume: Int
+        +brightness: Int
+    }
+    MainActivity --> ARActivity
+    MainActivity --> UserSettingsActivity
+    MainActivity --> TutorialActivity
+    FirebaseManager --> User
+    AppDatabase --> Progress
