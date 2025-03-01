@@ -1,0 +1,216 @@
+sequenceDiagram
+    participant User
+    participant App as MemoriesAR App
+    participant HomeScreen
+    participant Camera as Camera Controller
+    participant QRScanner as ML Kit QR Scanner
+    participant ARViewer as AR Viewer Screen
+    participant ARController
+    participant ContentRepo as AR Content Repository
+    participant MediaRepo as Media Repository
+    participant UserRepo as User Repository
+    participant EasyAR
+    participant Firebase as Firebase Services
+    participant Storage as Cloud Storage
+    
+    %% App Startup Sequence
+    User->>App: Launch application
+    activate App
+    App->>UserRepo: checkAuthStatus()
+    activate UserRepo
+    UserRepo->>Firebase: getCurrentUser()
+    Firebase-->>UserRepo: authState
+    UserRepo-->>App: userStatus
+    deactivate UserRepo
+    
+    alt Not Authenticated
+        App->>User: Show login screen
+        User->>App: Enter credentials
+        App->>UserRepo: signIn(email, password)
+        UserRepo->>Firebase: signInWithEmailAndPassword()
+        Firebase-->>UserRepo: authResult
+        UserRepo-->>App: user
+    end
+    
+    App->>HomeScreen: Navigate to home
+    App-->>User: Display home screen
+    deactivate App
+    
+    %% QR Code Scanning Flow
+    User->>HomeScreen: Tap "Scan QR"
+    activate HomeScreen
+    HomeScreen->>Camera: startQRScan()
+    activate Camera
+    Camera->>QRScanner: processImage(cameraImage)
+    activate QRScanner
+    QRScanner-->>Camera: qrCodeData
+    deactivate QRScanner
+    Camera-->>HomeScreen: onQRCodeDetected(qrData)
+    deactivate Camera
+    HomeScreen->>ContentRepo: getARExperience(experienceId)
+    activate ContentRepo
+    ContentRepo->>Firebase: fetchDocument("experiences", experienceId)
+    Firebase-->>ContentRepo: experienceData
+    ContentRepo-->>HomeScreen: arExperience
+    deactivate ContentRepo
+    HomeScreen->>ARViewer: navigateTo(arExperience)
+    deactivate HomeScreen
+    
+    %% AR Viewing Experience
+    activate ARViewer
+    ARViewer->>ARController: initialize()
+    activate ARController
+    ARController->>EasyAR: init(context, key)
+    EasyAR-->>ARController: engineStatus
+    ARController-->>ARViewer: initComplete
+    
+    ARViewer->>MediaRepo: getMediaFile(arExperience.targetImageUrl)
+    activate MediaRepo
+    MediaRepo->>MediaRepo: getCachedFile(url)
+    
+    alt Cache Miss
+        MediaRepo->>Storage: downloadFile(url)
+        Storage-->>MediaRepo: imageFile
+        MediaRepo->>MediaRepo: cacheFile(url, file)
+    end
+    
+    MediaRepo-->>ARViewer: targetImageFile
+    deactivate MediaRepo
+    
+    ARViewer->>ARController: loadTargetImage(targetImageFile, experienceId)
+    ARController->>EasyAR: createImageTarget(imageFile)
+    EasyAR-->>ARController: imageTarget
+    
+    ARViewer->>MediaRepo: getMediaFile(arExperience.videoUrl)
+    activate MediaRepo
+    MediaRepo->>MediaRepo: getCachedFile(url)
+    
+    alt Cache Miss
+        MediaRepo->>Storage: downloadFile(url)
+        Storage-->>MediaRepo: videoFile
+        MediaRepo->>MediaRepo: cacheFile(url, file)
+    end
+    
+    MediaRepo-->>ARViewer: videoFile
+    deactivate MediaRepo
+    
+    ARViewer->>ARController: setVideoForTarget(experienceId, videoFile)
+    ARController->>EasyAR: setupRenderer(videoFile)
+    EasyAR-->>ARController: rendererReady
+    
+    ARViewer->>ARController: startTracking()
+    ARController->>EasyAR: startTracking()
+    ARViewer-->>User: Show camera view
+    deactivate ARController
+    
+    User->>User: Point camera at photograph
+    EasyAR->>ARController: onTargetFound(imageId)
+    activate ARController
+    ARController-->>ARViewer: onImageRecognized(imageId)
+    deactivate ARController
+    
+    ARViewer->>ARController: playVideo(imageId)
+    activate ARController
+    ARController->>EasyAR: renderVideoOnTarget(imageId)
+    ARController-->>ARViewer: playbackStarted
+    deactivate ARController
+    
+    ARViewer->>ContentRepo: incrementViewCount(experienceId)
+    ContentRepo->>Firebase: updateDocument("experiences", {viewCount: increment})
+    
+    User->>ARViewer: Tap Share Button
+    ARViewer->>User: Show share options
+    User->>ARViewer: Select share method
+    ARViewer->>System: shareExperience(qrCodeUrl, message)
+    deactivate ARViewer
+    
+    %% Create AR Experience Flow
+    User->>HomeScreen: Tap "Create AR"
+    activate HomeScreen
+    HomeScreen->>CreateScreen: Navigate to creation screen
+    deactivate HomeScreen
+    
+    activate CreateScreen
+    CreateScreen-->>User: Display creation wizard
+    
+    User->>CreateScreen: Select/Capture Target Image
+    CreateScreen->>MediaRepo: uploadImage(imageFile, userId)
+    activate MediaRepo
+    MediaRepo->>MediaRepo: compressImage(imageFile)
+    MediaRepo->>Storage: uploadFile(compressedFile, "images/userId/filename")
+    Storage-->>MediaRepo: downloadUrl
+    MediaRepo-->>CreateScreen: mediaFile
+    deactivate MediaRepo
+    
+    User->>CreateScreen: Select/Capture Video
+    CreateScreen->>MediaRepo: uploadVideo(videoFile, userId)
+    activate MediaRepo
+    MediaRepo->>MediaRepo: compressVideo(videoFile, quality)
+    MediaRepo->>Storage: uploadFile(compressedFile, "videos/userId/filename")
+    Storage-->>MediaRepo: downloadUrl
+    MediaRepo-->>CreateScreen: mediaFile
+    deactivate MediaRepo
+    
+    User->>CreateScreen: Enter title & description
+    User->>CreateScreen: Tap "Create AR Experience"
+    
+    CreateScreen->>ContentRepo: createARExperience(arData, imageFile, videoFile)
+    activate ContentRepo
+    ContentRepo->>ContentRepo: generateQRCode(experienceId)
+    ContentRepo->>Firebase: createDocument("experiences", arExperienceData)
+    Firebase-->>ContentRepo: documentId
+    ContentRepo-->>CreateScreen: arExperience
+    deactivate ContentRepo
+    
+    CreateScreen-->>User: Show success & share options
+    deactivate CreateScreen
+    
+    %% Profile and Content Management
+    User->>App: Navigate to Profile
+    activate App
+    App->>ProfileScreen: Navigate to profile
+    deactivate App
+    
+    activate ProfileScreen
+    ProfileScreen->>UserRepo: getUserProfile()
+    activate UserRepo
+    UserRepo->>Firebase: getDocument("users", userId)
+    Firebase-->>UserRepo: userData
+    UserRepo-->>ProfileScreen: user
+    deactivate UserRepo
+    
+    ProfileScreen->>ContentRepo: getUserExperiences(userId)
+    activate ContentRepo
+    ContentRepo->>Firebase: query("experiences", where("creatorId", "==", userId))
+    Firebase-->>ContentRepo: experiencesList
+    ContentRepo-->>ProfileScreen: arExperiences
+    deactivate ContentRepo
+    
+    ProfileScreen-->>User: Display profile & experiences
+    
+    User->>ProfileScreen: Tap on experience
+    ProfileScreen->>ExperienceDetail: Navigate to detail view(experienceId)
+    deactivate ProfileScreen
+    
+    activate ExperienceDetail
+    ExperienceDetail->>ContentRepo: getARExperience(experienceId)
+    activate ContentRepo
+    ContentRepo->>Firebase: getDocument("experiences", experienceId)
+    Firebase-->>ContentRepo: experienceData
+    ContentRepo-->>ExperienceDetail: arExperience
+    deactivate ContentRepo
+    
+    ExperienceDetail-->>User: Show experience details & stats
+    
+    User->>ExperienceDetail: Tap "Delete"
+    ExperienceDetail->>ContentRepo: deleteARExperience(experienceId)
+    activate ContentRepo
+    ContentRepo->>Firebase: deleteDocument("experiences", experienceId)
+    ContentRepo->>Storage: deleteFile(targetImageUrl)
+    ContentRepo->>Storage: deleteFile(videoUrl)
+    ContentRepo->>Storage: deleteFile(qrCodeUrl)
+    ContentRepo-->>ExperienceDetail: success
+    deactivate ContentRepo
+    
+    ExperienceDetail-->>User: Show deletion confirmation
+    deactivate ExperienceDetail

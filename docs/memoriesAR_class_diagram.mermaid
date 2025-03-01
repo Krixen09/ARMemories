@@ -1,0 +1,295 @@
+classDiagram
+    class Application {
+        -initialize()
+        +onCreate()
+        +getAppComponent(): AppComponent
+    }
+
+    class AppComponent {
+        <<interface>>
+        +getUserRepository(): UserRepository
+        +getARContentRepository(): ARContentRepository
+        +getMediaRepository(): MediaRepository
+    }
+
+    class MainActivity {
+        -viewModel: MainViewModel
+        +onCreate()
+        +onDestroy()
+        +navigateToFragment(fragment: Fragment)
+    }
+
+    class MainViewModel {
+        -userRepository: UserRepository
+        -navigation: MutableLiveData<NavigationEvent>
+        +checkAuthStatus(): LiveData<User>
+        +getNavigationEvent(): LiveData<NavigationEvent>
+        +navigateTo(destination: NavDestination)
+    }
+
+    class HomeFragment {
+        -viewModel: HomeViewModel
+        -cameraController: CameraController
+        +onCreateView(): View
+        +onViewCreated()
+        +startCamera()
+        +onQRCodeDetected(qrData: String)
+    }
+
+    class HomeViewModel {
+        -arContentRepository: ARContentRepository
+        -userRepository: UserRepository
+        -recentExperiences: MutableLiveData<List<ARExperience>>
+        +getRecentExperiences(): LiveData<List<ARExperience>>
+        +loadRecentExperiences()
+        +handleQRCodeData(qrData: String): ARExperience?
+    }
+
+    class CameraController {
+        -context: Context
+        -previewView: PreviewView
+        -cameraProvider: ProcessCameraProvider
+        -imageAnalysis: ImageAnalysis
+        -qrCodeDetector: BarcodeScanner
+        -onQRDetectedListener: OnQRDetectedListener
+        +initCamera()
+        +startQRScan()
+        +stopQRScan()
+        +release()
+    }
+
+    class ARViewFragment {
+        -viewModel: ARViewModel
+        -arController: ARController
+        +onCreateView(): View
+        +onViewCreated()
+        +startARSession(arExperienceId: String)
+        +onImageRecognized(imageId: String)
+        +onShareClicked()
+    }
+
+    class ARViewModel {
+        -arContentRepository: ARContentRepository
+        -mediaRepository: MediaRepository
+        -currentExperience: MutableLiveData<ARExperience>
+        -playbackState: MutableLiveData<PlaybackState>
+        +loadExperience(experienceId: String): LiveData<ARExperience>
+        +startVideoPlayback()
+        +pauseVideoPlayback()
+        +getPlaybackState(): LiveData<PlaybackState>
+        +increaseViewCount(experienceId: String)
+    }
+
+    class ARController {
+        -easyAREngine: Engine
+        -videoRenderer: VideoRenderer
+        -surfaceView: GLSurfaceView
+        -targetImages: Map<String, ImageTarget>
+        -onImageRecognizedListener: OnImageRecognizedListener
+        +initialize()
+        +loadTargetImage(imageUrl: String, imageId: String)
+        +startTracking()
+        +stopTracking()
+        +setVideoForTarget(imageId: String, videoUri: String)
+        +release()
+    }
+
+    class CreateARFragment {
+        -viewModel: CreateARViewModel
+        -cameraController: CameraController
+        -imagePickerLauncher: ActivityResultLauncher
+        -videoPickerLauncher: ActivityResultLauncher
+        +onCreateView(): View
+        +onViewCreated()
+        +onCaptureImageClicked()
+        +onSelectImageClicked()
+        +onCaptureVideoClicked()
+        +onSelectVideoClicked()
+        +onPreviewClicked()
+        +onCreateClicked()
+    }
+
+    class CreateARViewModel {
+        -arContentRepository: ARContentRepository
+        -mediaRepository: MediaRepository
+        -targetImageUri: MutableLiveData<Uri>
+        -videoUri: MutableLiveData<Uri>
+        -creationState: MutableLiveData<CreationState>
+        +setTargetImage(uri: Uri)
+        +setVideo(uri: Uri)
+        +getTargetImageUri(): LiveData<Uri>
+        +getVideoUri(): LiveData<Uri>
+        +getCreationState(): LiveData<CreationState>
+        +createARExperience(title: String, description: String): LiveData<Result<ARExperience>>
+    }
+
+    class ProfileFragment {
+        -viewModel: ProfileViewModel
+        -experiencesAdapter: ARExperienceAdapter
+        +onCreateView(): View
+        +onViewCreated()
+        +onSignOutClicked()
+        +onEditProfileClicked()
+    }
+
+    class ProfileViewModel {
+        -userRepository: UserRepository
+        -arContentRepository: ARContentRepository
+        -userProfile: MutableLiveData<User>
+        -userExperiences: MutableLiveData<List<ARExperience>>
+        +getUserProfile(): LiveData<User>
+        +getUserExperiences(): LiveData<List<ARExperience>>
+        +loadUserData()
+        +signOut()
+        +updateProfile(name: String, photoUri: Uri): LiveData<Result<User>>
+    }
+
+    class User {
+        +userId: String
+        +displayName: String
+        +email: String
+        +photoUrl: String
+        +createdAt: Date
+        +lastLogin: Date
+    }
+
+    class ARExperience {
+        +experienceId: String
+        +title: String
+        +description: String
+        +creatorId: String
+        +targetImageUrl: String
+        +videoUrl: String
+        +qrCodeUrl: String
+        +viewCount: Int
+        +createdAt: Date
+        +updatedAt: Date
+        +isPublic: Boolean
+    }
+
+    class MediaFile {
+        +fileId: String
+        +fileName: String
+        +fileUrl: String
+        +fileType: MediaType
+        +fileSizeBytes: Long
+        +uploadedAt: Date
+        +ownerId: String
+    }
+
+    class QRCode {
+        +qrId: String
+        +content: String
+        +imageUrl: String
+        +experienceId: String
+        +createdAt: Date
+    }
+
+    class UserRepository {
+        -firebaseAuth: FirebaseAuth
+        -firestore: FirebaseFirestore
+        -localUserDao: UserDao
+        +getCurrentUser(): LiveData<User>
+        +signIn(email: String, password: String): Task<User>
+        +signOut(): Task<Void>
+        +createUser(email: String, password: String, name: String): Task<User>
+        +updateUserProfile(userId: String, updates: Map<String, Any>): Task<Void>
+        +deleteUser(userId: String): Task<Void>
+    }
+
+    class ARContentRepository {
+        -firestore: FirebaseFirestore
+        -storage: FirebaseStorage
+        -localARDao: ARExperienceDao
+        -qrCodeGenerator: QRCodeGenerator
+        +getARExperience(experienceId: String): LiveData<ARExperience>
+        +getUserExperiences(userId: String): LiveData<List<ARExperience>>
+        +createARExperience(arExperience: ARExperience, targetImageFile: File, videoFile: File): Task<ARExperience>
+        +updateARExperience(experienceId: String, updates: Map<String, Any>): Task<Void>
+        +deleteARExperience(experienceId: String): Task<Void>
+        +incrementViewCount(experienceId: String): Task<Void>
+        +getRecentExperiences(limit: Int): LiveData<List<ARExperience>>
+    }
+
+    class MediaRepository {
+        -storage: FirebaseStorage
+        -mediaCache: MediaCache
+        -compressor: MediaCompressor
+        +uploadImage(imageFile: File, userId: String): Task<MediaFile>
+        +uploadVideo(videoFile: File, userId: String): Task<MediaFile>
+        +getMediaFile(fileUrl: String): LiveData<File>
+        +deleteMediaFile(fileUrl: String): Task<Void>
+        +compressVideo(videoFile: File, quality: VideoQuality): Task<File>
+        +trimVideo(videoFile: File, startMs: Long, endMs: Long): Task<File>
+    }
+
+    class QRCodeGenerator {
+        -firebaseStorage: FirebaseStorage
+        +generateQRCode(content: String): Bitmap
+        +saveQRCodeToStorage(qrBitmap: Bitmap, experienceId: String): Task<String>
+        +createDeepLink(experienceId: String): String
+    }
+
+    class MediaCache {
+        -context: Context
+        -cacheSize: Long
+        +getCachedFile(url: String): File?
+        +cacheFile(url: String, file: File): Boolean
+        +clearCache()
+        +getCacheSize(): Long
+    }
+
+    class EasyARHelper {
+        <<singleton>>
+        -engine: Engine
+        -initialized: AtomicBoolean
+        +initialize(context: Context, key: String): Boolean
+        +createImageTarget(imageFile: File): ImageTarget?
+        +createVideoRenderer(): VideoRenderer
+        +isInitialized(): Boolean
+        +shutdown()
+    }
+
+    class MLKitHelper {
+        <<singleton>>
+        -barcodeScanner: BarcodeScanner
+        +initialize(context: Context)
+        +createQRCodeDetector(): BarcodeScanner
+        +processImage(image: InputImage, callback: QRDetectionCallback)
+        +shutdown()
+    }
+    
+    %% Relationships
+    Application --* AppComponent
+    MainActivity --* MainViewModel
+    HomeFragment --* HomeViewModel
+    HomeFragment --* CameraController
+    ARViewFragment --* ARViewModel
+    ARViewFragment --* ARController
+    CreateARFragment --* CreateARViewModel
+    CreateARFragment --* CameraController
+    ProfileFragment --* ProfileViewModel
+    
+    MainViewModel ..> UserRepository
+    HomeViewModel ..> ARContentRepository
+    HomeViewModel ..> UserRepository
+    ARViewModel ..> ARContentRepository
+    ARViewModel ..> MediaRepository
+    CreateARViewModel ..> ARContentRepository
+    CreateARViewModel ..> MediaRepository
+    ProfileViewModel ..> UserRepository
+    ProfileViewModel ..> ARContentRepository
+    
+    ARController ..> EasyARHelper
+    CameraController ..> MLKitHelper
+    
+    UserRepository ..> User
+    ARContentRepository ..> ARExperience
+    ARContentRepository ..> QRCode
+    ARContentRepository ..> QRCodeGenerator
+    MediaRepository ..> MediaFile
+    MediaRepository ..> MediaCache
+    
+    AppComponent ..> UserRepository
+    AppComponent ..> ARContentRepository
+    AppComponent ..> MediaRepository
